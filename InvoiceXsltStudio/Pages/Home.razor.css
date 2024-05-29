@@ -1,0 +1,5 @@
+﻿.editor, #xmlEditorId {
+    height: 80vh;
+    width: 30vw;
+    border: 3px solid red;
+}
