@@ -1,5 +1,15 @@
-﻿.editor, #xmlEditorId {
-    height: 80vh;
-    width: 30vw;
-    border: 3px solid red;
+﻿.a4 {
+    width: 210mm;
+    height: 297mm;
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
 }
+
+.editor-container {
+    position: relative;
+    height: 40vh;
+    width: 50vw;
+}
+

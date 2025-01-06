@@ -1,4 +1,186 @@
 ﻿@page "/"
+@using System.Xml
+@using BlazorMonaco
+@using BlazorMonaco.Editor
+@using BlazorMonaco.Languages
+@using System.Xml.Xsl
+@inject IJSRuntime _jsRuntime
+
+<PageTitle>XML ve XSLT Dönüştürücü</PageTitle>
+
+<div class="container d-flex flex-column vh-100 p-4">
+    <!-- Güncelle Butonu -->
+    <div class="mb-3">
+        <RadzenButton Text="Güncelle" Click="UpdateHtml" Class="btn btn-primary w-100"/>
+    </div>
+
+    <!-- Ana İçerik Alanı -->
+    <div class="d-flex flex-column flex-md-row gap-3">
+        <!-- Editör Alanları -->
+        <div class="d-flex flex-column flex-grow-1 gap-2">
+            <div @ref="_xmlEditorContainer" class="editor-container border p-2 mb-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <b>XML Editor</b>
+                    <button @onclick="ToggleXmlFullscreen" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-expand-arrows-alt"></i> <!-- Tam ekran ikonu -->
+                    </button>
+                </div>
+                <StandaloneCodeEditor CssClass="h-100 w-100" Id="xmlEditorId" @ref="_editorXml" ConstructionOptions="XmlConstructionOptions"/>
+            </div>
+
+            <div @ref="_xsltEditorContainer" class="editor-container border p-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <b>XSLT Editor</b>
+                    <button @onclick="ToggleXsltFullscreen" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-expand-arrows-alt"></i> <!-- Tam ekran ikonu -->
+                    </button>
+                </div>
+                <StandaloneCodeEditor CssClass="h-100 w-100" Id="xsltEditorId" @ref="_editorXslt" ConstructionOptions="XsltConstructionOptions"/>
+            </div>
+        </div>
+
+        <!-- HTML Çıktısı Alanı -->
+        <div class="overflow-auto p-2 border">
+            <b>HTML Çıktısı</b>
+            <div class="a4">
+                @((MarkupString)Html)
+            </div>
+        </div>
+    </div>
+</div>
+
 @code {
-   
+    private string Html { get; set; } = string.Empty;
+    private StandaloneCodeEditor _editorXml;
+    private StandaloneCodeEditor _editorXslt;
+    private ElementReference _xmlEditorContainer;
+    private ElementReference _xsltEditorContainer;
+    private bool _xmlFullscreen = false;
+    private bool _xsltFullscreen = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Html = "Güncelle butonuna basarak HTML çıktısını oluşturabilirsiniz.";
+    }
+
+    private async Task UpdateHtml()
+    {
+        try
+        {
+            XslCompiledTransform xsltCompiled = new XslCompiledTransform();
+
+            // XSLT içeriğini al ve yükle
+            var xs = await _editorXslt.GetValue();
+            using (var reader = XmlReader.Create(new StringReader(xs)))
+            {
+                xsltCompiled.Load(reader);
+            }
+
+            // XML içeriğini al ve dönüştür
+            var xm = await _editorXml.GetValue();
+            using var xmlReader = XmlReader.Create(new StringReader(xm));
+            using StringWriter writer = new StringWriter();
+
+            xsltCompiled.Transform(xmlReader, null, writer);
+
+            Html = writer.ToString();
+        }
+        catch (Exception ex)
+        {
+            Html = $"<div style='color:red;'>Hata: {ex.Message}</div>";
+        }
+    }
+
+    private StandaloneEditorConstructionOptions XmlConstructionOptions(StandaloneCodeEditor editor)
+    {
+        return new StandaloneEditorConstructionOptions
+        {
+            AutomaticLayout = true,
+            Language = "xml",
+            Theme = "vs-dark",
+            FontSize = 14,
+            LineNumbers = "on",
+            TabSize = 4,
+            Value = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<catalog>
+    <cd>
+        <title>Empire Burlesque</title>
+        <artist>Bob Dylan</artist>
+        <country>USA</country>
+        <company>Columbia</company>
+        <price>10.90</price>
+        <year>1985</year>
+    </cd>
+    <cd>
+        <title>Hide your heart</title>
+        <artist>Bonnie Tyler</artist>
+        <country>UK</country>
+        <company>CBS Records</company>
+        <price>9.90</price>
+        <year>1988</year>
+    </cd>
+</catalog>"
+        };
+    }
+
+    private StandaloneEditorConstructionOptions XsltConstructionOptions(StandaloneCodeEditor editor)
+    {
+        return new StandaloneEditorConstructionOptions
+        {
+            AutomaticLayout = true,
+            Language = "xml",
+            Theme = "vs-dark",
+            FontSize = 14,
+            LineNumbers = "on",
+            TabSize = 4,
+            Value = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<xsl:stylesheet version=""1.0"" xmlns:xsl=""http://www.w3.org/1999/XSL/Transform"">
+    <xsl:template match=""/"">
+        <html>
+        <body>
+            <h2>My CD Collection</h2>
+            <table border=""1"">
+                <tr bgcolor=""#9acd32"">
+                    <th style=""text-align:left"">Title</th>
+                    <th style=""text-align:left"">Artist</th>
+                </tr>
+                <xsl:for-each select=""catalog/cd"">
+                    <tr>
+                        <td><xsl:value-of select=""title"" /></td>
+                        <td><xsl:value-of select=""artist"" /></td>
+                    </tr>
+                </xsl:for-each>
+            </table>
+        </body>
+        </html>
+    </xsl:template>
+</xsl:stylesheet>"
+        };
+    }
+
+    private async Task ToggleXmlFullscreen()
+    {
+        _xmlFullscreen = !_xmlFullscreen;
+        if (_xmlFullscreen)
+        {
+            await _jsRuntime.InvokeVoidAsync("fullscreen", _xmlEditorContainer);
+        }
+        else
+        {
+            await _jsRuntime.InvokeVoidAsync("exitFullscreen", _xmlEditorContainer);
+        }
+    }
+
+    private async Task ToggleXsltFullscreen()
+    {
+        _xsltFullscreen = !_xsltFullscreen;
+        if (_xsltFullscreen)
+        {
+            await _jsRuntime.InvokeVoidAsync("fullscreen", _xsltEditorContainer);
+        }
+        else
+        {
+            await _jsRuntime.InvokeVoidAsync("exitFullscreen", _xsltEditorContainer);
+        }
+    }
 }
