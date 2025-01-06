@@ -1,4 +1,220 @@
 ﻿@page "/"
+@using System.Xml
+@using System.Xml.Xsl
+@inject IJSRuntime JsRuntime
+
+<PageTitle>XML ve XSLT Dönüştürücü</PageTitle>
+
+<div class="d-flex flex-column vh-100 vw-100 p-4 m-0 overflow-auto">
+    <div class="mb-3 d-flex gap-2">
+        <button @onclick="UpdateHtml" class="btn btn-primary">Güncelle</button>
+        <button @onclick="GeneratePdf" class="btn btn-secondary" disabled>PDF Görüntüle - yakında </button>
+    </div>
+    <div class="d-flex flex-column flex-md-row gap-3">
+        <div class="d-flex flex-column gap-5 w-50 h-100">
+            <div @ref="_xmlEditorContainer" class="editor-container border" style="height: 40vh">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <b>XML Editor</b>
+                    <button @onclick="ToggleXmlFullscreen" class="btn btn-outline-secondary btn-sm">
+                        <i class="@(_xmlFullscreen ? "fa-solid fa-compress" : "fa-solid fa-expand")"></i>
+                    </button>
+                </div>
+                <StandaloneCodeEditor
+                    CssClass="h-100 w-100"
+                    Id="xmlEditorId"
+                    @ref="_editorXml"
+                    ConstructionOptions="XmlConstructionOptions" />
+            </div>
+            <div @ref="_xsltEditorContainer" class="editor-container border" style="height: 40vh">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <b>XSLT Editor</b>
+                    <button @onclick="ToggleXsltFullscreen" class="btn btn-outline-secondary btn-sm">
+                        <i class="@(_xsltFullscreen ? "fa-solid fa-compress" : "fa-solid fa-expand")"></i>
+                    </button>
+                </div>
+                <StandaloneCodeEditor
+                    CssClass="h-100 w-100"
+                    Id="xsltEditorId"
+                    @ref="_editorXslt"
+                    ConstructionOptions="XsltConstructionOptions" />
+            </div>
+        </div>
+        <div class="overflow-auto p-2 border w-100">
+            <b>HTML Çıktısı</b>
+            <div class="a4">
+                @((MarkupString)Html)
+            </div>
+        </div>
+    </div>
+</div>
+
 @code {
-   
+    private string Html { get; set; } = string.Empty;
+    private StandaloneCodeEditor _editorXml = null!;
+    private StandaloneCodeEditor _editorXslt = null!;
+    private ElementReference _xmlEditorContainer;
+    private ElementReference _xsltEditorContainer;
+    private bool _xmlFullscreen;
+    private bool _xsltFullscreen;
+
+    protected override Task OnInitializedAsync()
+    {
+        Html = "Güncelle butonuna basarak HTML çıktısını oluşturabilirsiniz.";
+        return Task.CompletedTask;
+    }
+
+    private async Task UpdateHtml()
+    {
+        try
+        {
+            var xsltCompiled = new XslCompiledTransform();
+            var xs = await _editorXslt.GetValue();
+            using (var reader = XmlReader.Create(new StringReader(xs)))
+            {
+                xsltCompiled.Load(reader);
+            }
+            var xm = await _editorXml.GetValue();
+            using var xmlReader = XmlReader.Create(new StringReader(xm));
+            await using var writer = new StringWriter();
+            xsltCompiled.Transform(xmlReader, null, writer);
+            Html = writer.ToString();
+        }
+        catch (Exception ex)
+        {
+            Html = $"<div style='color:red;'>Hata: {ex.Message}</div>";
+        }
+    }
+
+    private StandaloneEditorConstructionOptions XmlConstructionOptions(StandaloneCodeEditor editor)
+    {
+        return new StandaloneEditorConstructionOptions
+        {
+            AutomaticLayout = true,
+            Language = "xml",
+            Theme = "vs-dark",
+            FontSize = 14,
+            LineNumbers = "on",
+            TabSize = 4,
+            Value = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<Invoice xmlns=""urn:oasis:names:specification:ubl:schema:xsd:Invoice-2""
+         xmlns:cbc=""urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2""
+         xmlns:cac=""urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"">
+    <cbc:ID>FTR123456</cbc:ID>
+    <cbc:IssueDate>2025-01-09</cbc:IssueDate>
+    <cac:AccountingSupplierParty>
+        <cac:Party>
+            <cbc:Name>XYZ A.Ş.</cbc:Name>
+            <cac:PostalAddress>
+                <cbc:StreetName>Örnek Mahallesi</cbc:StreetName>
+                <cbc:City>İstanbul</cbc:City>
+            </cac:PostalAddress>
+        </cac:Party>
+    </cac:AccountingSupplierParty>
+    <cac:AccountingCustomerParty>
+        <cac:Party>
+            <cbc:Name>ABC Ltd. Şti.</cbc:Name>
+            <cac:PostalAddress>
+                <cbc:StreetName>Başka Mahalle</cbc:StreetName>
+                <cbc:City>İzmir</cbc:City>
+            </cac:PostalAddress>
+        </cac:Party>
+    </cac:AccountingCustomerParty>
+    <cac:InvoiceLine>
+        <cac:Item>
+            <cbc:Name>Ürün A</cbc:Name>
+        </cac:Item>
+        <cbc:InvoicedQuantity>1</cbc:InvoicedQuantity>
+        <cac:Price>
+            <cbc:PriceAmount>100</cbc:PriceAmount>
+        </cac:Price>
+        <cbc:LineExtensionAmount>100</cbc:LineExtensionAmount>
+    </cac:InvoiceLine>
+    <cac:TaxTotal>
+        <cbc:TaxAmount>18</cbc:TaxAmount>
+    </cac:TaxTotal>
+    <cac:LegalMonetaryTotal>
+        <cbc:PayableAmount>118</cbc:PayableAmount>
+    </cac:LegalMonetaryTotal>
+</Invoice>"
+
+        };
+    }
+
+    private StandaloneEditorConstructionOptions XsltConstructionOptions(StandaloneCodeEditor editor)
+    {
+        return new StandaloneEditorConstructionOptions
+        {
+            AutomaticLayout = true,
+            Language = "xml",
+            Theme = "vs-dark",
+            FontSize = 14,
+            LineNumbers = "on",
+            TabSize = 4,
+            Value = @"<?xml version=""1.0"" encoding=""UTF-8""?>
+<xsl:stylesheet xmlns:xsl=""http://www.w3.org/1999/XSL/Transform"" version=""1.0""
+                xmlns=""urn:oasis:names:specification:ubl:schema:xsd:Invoice-2""
+                xmlns:cbc=""urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2""
+                xmlns:cac=""urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"">
+    <xsl:template match=""*"">
+        <html>
+            <head>
+                <title>Fatura</title>
+                <style>
+                    table { border-collapse: collapse; width: 100%; }
+                    th, td { border: 1px solid black; padding: 8px; text-align: left; }
+                    th { background-color: #f2f2f2; }
+                </style>
+            </head>
+            <body>
+                <h1>Fatura</h1>
+                <p><strong>Fatura Numarası:</strong> <xsl:value-of select=""//cbc:ID""/></p>
+                <p><strong>Fatura Tarihi:</strong> <xsl:value-of select=""//cbc:IssueDate""/></p>
+                <h2>Satıcı Bilgileri</h2>
+                <p><xsl:value-of select=""//cac:AccountingSupplierParty/cac:Party/cbc:Name""/></p>
+                <p><xsl:value-of select=""//cac:AccountingSupplierParty/cac:Party/cac:PostalAddress/cbc:StreetName""/></p>
+                <p><xsl:value-of select=""//cac:AccountingSupplierParty/cac:Party/cac:PostalAddress/cbc:City""/></p>
+                <h2>Müşteri Bilgileri</h2>
+                <p><xsl:value-of select=""//cac:AccountingCustomerParty/cac:Party/cbc:Name""/></p>
+                <p><xsl:value-of select=""//cac:AccountingCustomerParty/cac:Party/cac:PostalAddress/cbc:StreetName""/></p>
+                <p><xsl:value-of select=""//cac:AccountingCustomerParty/cac:Party/cac:PostalAddress/cbc:City""/></p>
+                <h2>Ürün Detayları</h2>
+                <table>
+                    <tr>
+                        <th>Ürün Adı</th>
+                        <th>Adet</th>
+                        <th>Birim Fiyat (TRY)</th>
+                        <th>Toplam (TRY)</th>
+                    </tr>
+                    <tr>
+                        <td><xsl:value-of select=""//cac:InvoiceLine/cac:Item/cbc:Name""/></td>
+                        <td><xsl:value-of select=""//cac:InvoiceLine/cbc:InvoicedQuantity""/></td>
+                        <td><xsl:value-of select=""//cac:InvoiceLine/cac:Price/cbc:PriceAmount""/></td>
+                        <td><xsl:value-of select=""//cac:InvoiceLine/cbc:LineExtensionAmount""/></td>
+                    </tr>
+                </table>
+                <h2>Toplamlar</h2>
+                <p><strong>Vergi:</strong> <xsl:value-of select=""//cac:TaxTotal/cbc:TaxAmount""/> TRY</p>
+                <p><strong>Genel Toplam:</strong> <xsl:value-of select=""//cac:LegalMonetaryTotal/cbc:PayableAmount""/> TRY</p>
+            </body>
+        </html>
+    </xsl:template>
+</xsl:stylesheet>"};
+    }
+
+    private async Task ToggleXmlFullscreen()
+    {
+        _xmlFullscreen = !_xmlFullscreen;
+        await JsRuntime.InvokeVoidAsync(_xmlFullscreen ? "fullscreen" : "exitFullscreen", _xmlEditorContainer);
+    }
+
+    private async Task ToggleXsltFullscreen()
+    {
+        _xsltFullscreen = !_xsltFullscreen;
+        await JsRuntime.InvokeVoidAsync(_xsltFullscreen ? "fullscreen" : "exitFullscreen", _xsltEditorContainer);
+    }
+
+    private async Task GeneratePdf()
+    {
+        
+    }
 }

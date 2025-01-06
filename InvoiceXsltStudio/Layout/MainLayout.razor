@@ -1,18 +1,5 @@
 ﻿@inherits LayoutComponentBase
-@inject NavigationManager _navigation
 
-<div class="page">
-    <main>
-        <div class="px-4">
-            <RadzenButton 
-                Shade="Shade.Lighter"
-                          Click=@(args => _navigation.NavigateTo("/Studio"))
-                          Text="Invoice Xslt Stuio" 
-                ButtonStyle="ButtonStyle.Primary" />
-        </div>
-
-        <article class="content">
-            @Body
-        </article>
-    </main>
-</div>
+<main style="width: 100vw; height: 100vh; overflow: hidden">
+    @Body
+</main>
